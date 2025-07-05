@@ -49,8 +49,8 @@ jobs:
           
           # Check if we have a record of the last built commit
           CURRENT_COMMIT=""
-          if [ -f "last_built_commit.txt" ]; then
-            CURRENT_COMMIT=$(cat last_built_commit.txt)
+          if [ -f "last_built_commit.txt" ] && [ -s "last_built_commit.txt" ]; then
+            CURRENT_COMMIT=$(cat last_built_commit.txt | grep -v '^#' | grep -v '^$' | head -1)
           fi
           echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
           
