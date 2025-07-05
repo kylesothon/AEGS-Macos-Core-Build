@@ -1,0 +1,233 @@
+name: Official Aegisum macOS Core Wallet Auto-Builder
+
+on:
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if no updates available'
+        required: false
+        default: false
+        type: boolean
+      create_release:
+        description: 'Create GitHub release with built artifacts'
+        required: false
+        default: true
+        type: boolean
+
+  # Automatic daily check for updates
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+
+  # Trigger on push to main branch (for script updates)
+  push:
+    branches: [main]
+    paths:
+      - 'build_aegisum_macos.sh'
+      - '.github/workflows/auto-build.yml'
+
+jobs:
+  check-updates:
+    name: Check for Aegisum Core Updates
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      latest_commit: ${{ steps.check.outputs.latest_commit }}
+      current_commit: ${{ steps.check.outputs.current_commit }}
+      version_tag: ${{ steps.check.outputs.version_tag }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check for Aegisum Core Updates
+        id: check
+        run: |
+          # Get latest commit from Aegisum core repository
+          LATEST_COMMIT=$(curl -s https://api.github.com/repos/Aegisum/aegisum-core/commits/main | jq -r '.sha')
+          echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          
+          # Check if we have a record of the last built commit
+          CURRENT_COMMIT=""
+          if [ -f "last_built_commit.txt" ]; then
+            CURRENT_COMMIT=$(cat last_built_commit.txt)
+          fi
+          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          
+          # Create version tag
+          VERSION_TAG="v$(date +'%Y%m%d-%H%M')-${LATEST_COMMIT:0:8}"
+          echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+          
+          # Determine if we should build
+          SHOULD_BUILD="false"
+          if [ "${{ github.event.inputs.force_build }}" == "true" ]; then
+            echo "🔄 Force build requested"
+            SHOULD_BUILD="true"
+          elif [ "$LATEST_COMMIT" != "$CURRENT_COMMIT" ]; then
+            echo "🆕 New commit detected: $LATEST_COMMIT (was: $CURRENT_COMMIT)"
+            SHOULD_BUILD="true"
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            echo "🔧 Build script updated"
+            SHOULD_BUILD="true"
+          else
+            echo "✅ No updates available"
+            SHOULD_BUILD="false"
+          fi
+          
+          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "Should build: $SHOULD_BUILD"
+
+  build-macos:
+    name: Build Aegisum macOS Wallet
+    runs-on: macos-latest
+    needs: check-updates
+    if: needs.check-updates.outputs.should_build == 'true'
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Build Environment
+        run: |
+          # Set Git identity for any git operations
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Make build script executable
+          chmod +x build_aegisum_macos.sh
+
+      - name: Clean Protobuf Installation
+        run: |
+          # Ensure clean slate for Protobuf
+          brew uninstall --ignore-dependencies protobuf || true
+          brew cleanup || true
+
+      - name: Run Official Aegisum macOS Builder
+        env:
+          CI: true
+          GITHUB_ACTIONS: true
+          HOME: ${{ github.workspace }}
+          PATH: "${{ github.workspace }}/local/protobuf-3.6.1/bin:/usr/local/bin:/opt/homebrew/bin:${{ env.PATH }}"
+          PKG_CONFIG_PATH: "${{ github.workspace }}/local/protobuf-3.6.1/lib/pkgconfig"
+          LD_LIBRARY_PATH: "${{ github.workspace }}/local/protobuf-3.6.1/lib"
+          LDFLAGS: "-L${{ github.workspace }}/local/protobuf-3.6.1/lib"
+          CPPFLAGS: "-I${{ github.workspace }}/local/protobuf-3.6.1/include"
+          PROTOC: "${{ github.workspace }}/local/protobuf-3.6.1/bin/protoc"
+        run: |
+          echo "🚀 Starting Official Aegisum macOS Core Wallet build..."
+          ./build_aegisum_macos.sh
+
+      - name: Verify Build Artifacts
+        run: |
+          echo "🔍 Verifying build artifacts..."
+          ls -la compiled_wallets_macos/
+          
+          # Check for required files
+          if [ ! -f "compiled_wallets_macos/aegisum-qt" ]; then
+            echo "❌ aegisum-qt not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "compiled_wallets_macos/Aegisum-Wallet-macOS.dmg" ]; then
+            echo "❌ DMG file not found!"
+            exit 1
+          fi
+          
+          echo "✅ All required artifacts present"
+
+      - name: Update Build Record
+        run: |
+          # Record the commit we just built
+          echo "${{ needs.check-updates.outputs.latest_commit }}" > last_built_commit.txt
+          
+          # Commit the update if running on schedule or manual trigger
+          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            git add last_built_commit.txt
+            git commit -m "🤖 Auto-update: Built commit ${{ needs.check-updates.outputs.latest_commit }}" || true
+            git push || true
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegisum-macos-wallet-${{ needs.check-updates.outputs.version_tag }}
+          path: |
+            compiled_wallets_macos/aegisum-qt
+            compiled_wallets_macos/aegisumd
+            compiled_wallets_macos/aegisum-cli
+            compiled_wallets_macos/aegisum-tx
+            compiled_wallets_macos/Aegisum-Qt.app
+            compiled_wallets_macos/Aegisum-Wallet-macOS.dmg
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: ${{ github.event.inputs.create_release != 'false' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-updates.outputs.version_tag }}
+          name: "🍎 Aegisum macOS Wallet ${{ needs.check-updates.outputs.version_tag }}"
+          body: |
+            ## 🍎 Official Aegisum macOS Core Wallet
+            
+            **Auto-built from latest Aegisum core:** `${{ needs.check-updates.outputs.latest_commit }}`
+            
+            ### 📦 What's Included:
+            - **Aegisum-Wallet-macOS.dmg** - Complete installer with drag-and-drop installation
+            - **Aegisum-Qt.app** - Native macOS application bundle
+            - **aegisum-qt** - Qt wallet binary
+            - **aegisumd** - Daemon binary
+            - **aegisum-cli** - Command line interface
+            - **aegisum-tx** - Transaction utility
+            
+            ### 🔧 Installation:
+            1. Download `Aegisum-Wallet-macOS.dmg`
+            2. Open the DMG file
+            3. Drag `Aegisum-Qt.app` to your Applications folder
+            4. Launch from Applications or Launchpad
+            
+            ### ✅ Compatibility:
+            - macOS 10.14 (Mojave) and later
+            - Both Intel and Apple Silicon Macs supported
+            - Automatically bundled with all required dependencies
+            
+            ### 🔒 Security:
+            This build is automatically generated from the official Aegisum core repository using our verified build scripts.
+            
+            ---
+            *Built automatically by the Official Aegisum macOS Core Wallet Compiler*
+          files: |
+            compiled_wallets_macos/Aegisum-Wallet-macOS.dmg
+            compiled_wallets_macos/aegisum-qt
+            compiled_wallets_macos/aegisumd
+            compiled_wallets_macos/aegisum-cli
+            compiled_wallets_macos/aegisum-tx
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify-completion:
+    name: Notify Build Completion
+    runs-on: ubuntu-latest
+    needs: [check-updates, build-macos]
+    if: always()
+    
+    steps:
+      - name: Build Success Notification
+        if: needs.build-macos.result == 'success'
+        run: |
+          echo "🎉 Aegisum macOS wallet build completed successfully!"
+          echo "📦 Version: ${{ needs.check-updates.outputs.version_tag }}"
+          echo "🔗 Commit: ${{ needs.check-updates.outputs.latest_commit }}"
+      
+      - name: Build Failure Notification
+        if: needs.build-macos.result == 'failure'
+        run: |
+          echo "❌ Aegisum macOS wallet build failed!"
+          echo "🔍 Please check the build logs for details."
+          exit 1
+      
+      - name: No Build Needed
+        if: needs.check-updates.outputs.should_build == 'false'
+        run: |
+          echo "✅ No build needed - Aegisum core is up to date"
