@@ -178,6 +178,26 @@ else
     echo -e "${YELLOW}⚠ Warning: $BDB_CPP_FILE not found, skipping Boost patch${RESET}"
 fi
 
+# Patch Boost recursive_directory_iterator API (level() and no_push() methods)
+WALLETUTIL_CPP_FILE="src/wallet/walletutil.cpp"
+if [ -f "$WALLETUTIL_CPP_FILE" ]; then
+    if grep -q "it.level()" "$WALLETUTIL_CPP_FILE" || grep -q "it.no_push()" "$WALLETUTIL_CPP_FILE"; then
+        # Create a backup
+        cp "$WALLETUTIL_CPP_FILE" "$WALLETUTIL_CPP_FILE.boost_backup"
+        
+        # Replace level() and no_push() with compatible alternatives
+        sed -i '' \
+            -e 's/it\.level()/0/g' \
+            -e 's/it\.no_push();//g' \
+            "$WALLETUTIL_CPP_FILE"
+        echo -e "${CYAN}✔ Applied Boost recursive_directory_iterator patch to $WALLETUTIL_CPP_FILE${RESET}"
+    else
+        echo -e "${CYAN}✔ Boost recursive_directory_iterator patch not needed for $WALLETUTIL_CPP_FILE${RESET}"
+    fi
+else
+    echo -e "${YELLOW}⚠ Warning: $WALLETUTIL_CPP_FILE not found, skipping Boost recursive_directory_iterator patch${RESET}"
+fi
+
 # Patch configure.ac for macOS compatibility
 echo -e "${GREEN}🔧 Patching configure.ac for macOS compatibility...${RESET}"
 CONFIG_AC="configure.ac"
