@@ -1,0 +1,93 @@
+name: GitHub CI Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      os_target:
+        description: 'Choose the OS to build for'
+        required: true
+        default: 'ubuntu'
+        type: choice
+        options:
+          - ubuntu
+          - macos
+
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ${{ inputs.os_target == 'macos' && 'macos-latest' || 'ubuntu-22.04' }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Build Tag
+        id: set_tag
+        run: |
+          TAG="v$(date +'%Y%m%d-%H%M')"
+          echo "TAG_NAME=$TAG" >> $GITHUB_ENV
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Set Git Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Git Tag
+        run: |
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
+
+      - name: Make Scripts Executable
+        run: |
+          chmod +x ./build_aegisum_ubuntu.sh
+          chmod +x ./build_aegisum_mac.sh
+
+      # Ubuntu specific steps
+      - name: Install Dependencies (Ubuntu)
+        if: ${{ inputs.os_target == 'ubuntu' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Run Ubuntu Build Script
+        if: ${{ inputs.os_target == 'ubuntu' }}
+        run: |
+          echo -e "2\ny\ny\ny\ny\ny" | ./build_aegisum_ubuntu.sh
+
+      # macOS specific steps
+      - name: Uninstall Protobuf (macOS clean slate)
+        if: ${{ inputs.os_target == 'macos' }}
+        run: |
+          brew uninstall --ignore-dependencies protobuf || true
+          brew cleanup || true
+
+      - name: Run macOS Build Script
+        if: ${{ inputs.os_target == 'macos' }}
+        env:
+          HOME: ${{ github.workspace }}
+          PATH: "${{ github.workspace }}/local/protobuf-3.6.1/bin:/usr/local/bin:/opt/homebrew/bin:${{ env.PATH }}"
+          PKG_CONFIG_PATH: "${{ github.workspace }}/local/protobuf-3.6.1/lib/pkgconfig"
+          LD_LIBRARY_PATH: "${{ github.workspace }}/local/protobuf-3.6.1/lib"
+          LDFLAGS: "-L${{ github.workspace }}/local/protobuf-3.6.1/lib"
+          CPPFLAGS: "-I${{ github.workspace }}/local/protobuf-3.6.1/include"
+          PROTOC: "${{ github.workspace }}/local/protobuf-3.6.1/bin/protoc"
+        run: |
+          echo -e "2\ny\ny" | ./build_aegisum_mac.sh
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Aegisum ${{ env.TAG_NAME }}
+          generate_release_notes: true
+          files: |
+            ./compiled_wallets/*
+            ./compiled_wallets_macos/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
