@@ -158,51 +158,19 @@ jobs:
             compiled_wallets_macos/Aegisum-Wallet-macOS.dmg
           retention-days: 30
 
-      - name: Create GitHub Release
-        if: ${{ github.event.inputs.create_release != 'false' }}
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ needs.check-updates.outputs.version_tag }}
-          name: "🍎 Aegisum macOS Wallet ${{ needs.check-updates.outputs.version_tag }}"
-          body: |
-            ## 🍎 Official Aegisum macOS Core Wallet
-            
-            **Auto-built from latest Aegisum core:** `${{ needs.check-updates.outputs.latest_commit }}`
-            
-            ### 📦 What's Included:
-            - **Aegisum-Wallet-macOS.dmg** - Complete installer with drag-and-drop installation
-            - **Aegisum-Qt.app** - Native macOS application bundle
-            - **aegisum-qt** - Qt wallet binary
-            - **aegisumd** - Daemon binary
-            - **aegisum-cli** - Command line interface
-            - **aegisum-tx** - Transaction utility
-            
-            ### 🔧 Installation:
-            1. Download `Aegisum-Wallet-macOS.dmg`
-            2. Open the DMG file
-            3. Drag `Aegisum-Qt.app` to your Applications folder
-            4. Launch from Applications or Launchpad
-            
-            ### ✅ Compatibility:
-            - macOS 10.14 (Mojave) and later
-            - Both Intel and Apple Silicon Macs supported
-            - Automatically bundled with all required dependencies
-            
-            ### 🔒 Security:
-            This build is automatically generated from the official Aegisum core repository using our verified build scripts.
-            
-            ---
-            *Built automatically by the Official Aegisum macOS Core Wallet Compiler*
-          files: |
-            compiled_wallets_macos/Aegisum-Wallet-macOS.dmg
-            compiled_wallets_macos/aegisum-qt
-            compiled_wallets_macos/aegisumd
-            compiled_wallets_macos/aegisum-cli
-            compiled_wallets_macos/aegisum-tx
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Summary
+        run: |
+          echo "🎉 BUILD COMPLETED SUCCESSFULLY!"
+          echo "📁 All wallet files created and uploaded as artifacts"
+          echo "💾 Download artifacts from the Actions tab to get your wallet files"
+          echo ""
+          echo "📦 Available files:"
+          echo "   ✅ Aegisum-Wallet-macOS.dmg (Complete installer)"
+          echo "   ✅ Aegisum-Qt.app (macOS app bundle)"
+          echo "   ✅ aegisum-qt (Qt wallet binary)"
+          echo "   ✅ aegisumd (Daemon binary)"
+          echo "   ✅ aegisum-cli (Command line interface)"
+          echo "   ✅ aegisum-tx (Transaction utility)"
 
   notify-completion:
     name: Notify Build Completion
