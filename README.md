@@ -40,14 +40,26 @@ This repository contains the **Official Aegisum macOS Core Wallet Compiler** - a
 
 ## 🚀 Quick Start
 
-### Automated Builds (Recommended)
+### 📥 Download Ready-Built DMG (Easiest)
 
-The system automatically builds new releases daily at 6 AM UTC when updates are detected. You can also trigger builds manually:
+**Your Aegisum wallet is already built and ready!**
+
+1. **Go to**: https://github.com/kylesothon/AEGS-Macos-Core-Build/actions/runs/16085571647
+2. **Scroll down to "Artifacts"** section
+3. **Click**: `aegisum-macos-wallet-v20250705-0650-b90b6c9f` (126 MB)
+4. **Extract the ZIP** and double-click `Aegisum-Wallet-macOS.dmg`
+5. **Drag to Applications** and enjoy!
+
+📖 **[Complete Download Guide →](HOW_TO_DOWNLOAD_DMG.md)**
+
+### 🔄 Automated Builds (For Updates)
+
+The system automatically builds new releases daily at 6:50 AM UTC when updates are detected. You can also trigger builds manually:
 
 1. **Go to the Actions tab** in your GitHub repository
 2. **Click "Official Aegisum macOS Core Wallet Auto-Builder"**
 3. **Click "Run workflow"** and optionally enable "Force build"
-4. **Download the DMG** from the generated release
+4. **Download the DMG** from the generated artifacts
 
 ### Manual Local Build
 
