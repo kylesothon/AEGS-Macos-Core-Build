@@ -164,7 +164,7 @@ cd Aegisum
 echo -e "\n${GREEN}🔧 Applying macOS compatibility patches...${RESET}"
 
 # Patch Boost filesystem API (overwrite_if_exists -> overwrite_existing)
-BDB_CPP_FILE="wallet/bdb.cpp"
+BDB_CPP_FILE="src/wallet/bdb.cpp"
 if [ -f "$BDB_CPP_FILE" ]; then
     if grep -q "fs::copy_file(pathSrc, pathDest, fs::copy_option::overwrite_if_exists);" "$BDB_CPP_FILE"; then
       sed -i '' \
@@ -174,6 +174,8 @@ if [ -f "$BDB_CPP_FILE" ]; then
     else
       echo -e "${CYAN}✔ Boost patch not needed for $BDB_CPP_FILE${RESET}"
     fi
+else
+    echo -e "${YELLOW}⚠ Warning: $BDB_CPP_FILE not found, skipping Boost patch${RESET}"
 fi
 
 # Patch configure.ac for macOS compatibility
