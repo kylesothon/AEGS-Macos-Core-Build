@@ -140,19 +140,10 @@ jobs:
 
       - name: Update Build Record
         run: |
-          # Record the commit we just built
+          # Record the commit we just built (for tracking purposes)
           echo "${{ needs.check-updates.outputs.latest_commit }}" > last_built_commit.txt
-          
-          # Commit the update if running on schedule or manual trigger
-          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Configure git (in case it's not set)
-            /usr/bin/git config --global user.name "Official Aegisum Builder" || true
-            /usr/bin/git config --global user.email "builder@aegisum.com" || true
-            
-            /usr/bin/git add last_built_commit.txt || true
-            /usr/bin/git commit -m "🤖 Auto-update: Built commit ${{ needs.check-updates.outputs.latest_commit }}" || true
-            /usr/bin/git push || true
-          fi
+          echo "✅ Build record updated: ${{ needs.check-updates.outputs.latest_commit }}"
+          echo "📝 Build tracking file created successfully"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
