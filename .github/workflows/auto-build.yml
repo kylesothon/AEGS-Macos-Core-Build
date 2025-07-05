@@ -120,7 +120,7 @@ jobs:
       - name: Verify Build Artifacts
         run: |
           echo "🔍 Verifying build artifacts..."
-          ls -la compiled_wallets_macos/
+          /bin/ls -la compiled_wallets_macos/ || echo "Directory listing failed, but continuing verification..."
           
           # Check for required files
           if [ ! -f "compiled_wallets_macos/aegisum-qt" ]; then
@@ -134,6 +134,9 @@ jobs:
           fi
           
           echo "✅ All required artifacts present"
+          echo "📁 Files found:"
+          echo "   - aegisum-qt: $([ -f compiled_wallets_macos/aegisum-qt ] && echo "✅" || echo "❌")"
+          echo "   - DMG file: $([ -f compiled_wallets_macos/Aegisum-Wallet-macOS.dmg ] && echo "✅" || echo "❌")"
 
       - name: Update Build Record
         run: |
